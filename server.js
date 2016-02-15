@@ -16,18 +16,30 @@ import express from 'express';
 import bodyParser from 'body-parser';
 
 const app = express();
+const staticRouter = express.Router();
+const apiRouter = express.Router();
 
 const COMMENTS_FILE = path.join(__dirname, 'comments.json');
 const INDEX = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), {encoding: 'utf8'});
 app.set('port', (process.env.PORT || 4000));
 
-app.use('/', express.static(path.join(__dirname, 'public')));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({
+const notFound = (req, res, next) => {
+  res.status(404).send(`${req.originalUrl} Not Found.`);
+};
+
+const errorHandler = (err, req, res, next) => {
+  res.status(500).send('Server error');
+};
+
+staticRouter.use('/', express.static(path.join(__dirname, 'public')));
+staticRouter.use(/^\/(css|scripts)/, notFound);
+
+apiRouter.use(bodyParser.json());
+apiRouter.use(bodyParser.urlencoded({
     extended: true
 }));
 
-app.get('/api/comments', (req, res) =>
+apiRouter.get('/comments', (req, res) =>
     fs.readFile(COMMENTS_FILE, (err, data) => {
         if (err) {
             console.error(err);
@@ -38,7 +50,7 @@ app.get('/api/comments', (req, res) =>
     })
 );
 
-app.post('/api/comments', (req, res) =>
+apiRouter.post('/comments', (req, res) =>
     fs.readFile(COMMENTS_FILE, (err, data) => {
         if (err) {
             console.error(err);
@@ -65,7 +77,7 @@ app.post('/api/comments', (req, res) =>
     })
 );
 
-app.get('/api/authors/:author', (req, res) => {
+apiRouter.get('/authors/:author', (req, res) => {
     console.log('author: ', req.params.author);
     fs.readFile(COMMENTS_FILE, (err, data) => {
         if (err) {
@@ -79,10 +91,16 @@ app.get('/api/authors/:author', (req, res) => {
     });
 });
 
+apiRouter.use(notFound);
+
+app.use('/', staticRouter);
+app.use('/api', apiRouter);
+
 app.use('/', (req, res) => {
     res.send(INDEX)
 });
 
+app.use('/', errorHandler);
 
 
 app.listen(app.get('port'), function() {
